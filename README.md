@@ -1,9 +1,11 @@
-distributed_system
+Distributed_System
 =====
 
-An OTP application
+A distributed system written in Erlang
 
-Build
+This is a project I use to explore ideas and learn about distributed systems.
+
+Applications
 -----
 
-    $ rebar3 compile
+- worker_pool

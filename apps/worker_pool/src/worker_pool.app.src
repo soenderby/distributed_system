@@ -1,0 +1,15 @@
+{application, worker_pool,
+ [{description, "A worker pool application"},
+  {vsn, "1.0.0"},
+  {registered, [worker_pool]},
+  {mod, {worker_pool, []}},
+  {applications,
+   [kernel,
+    stdlib
+   ]},
+  {env,[]},
+  {modules, [worker_pool, worker_pool_server, worker_sup, worker_pool_sup, worker_pool_top_sup]},
+
+  {licenses, ["Apache 2.0"]},
+  {links, []}
+ ]}.

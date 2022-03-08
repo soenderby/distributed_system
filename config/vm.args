@@ -1,0 +1,6 @@
+-sname distributed_system
+
+-setcookie distributed_system_cookie
+
++K true
++A30

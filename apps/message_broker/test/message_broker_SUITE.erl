@@ -105,8 +105,8 @@ blocking_subscriber_should_not_block_messages_to_others(_Config) ->
     % Message that blocked subscriber will not handle
     mb:message(test, [{message, two}]),
     [
-     [{message, one}],[{message, two}],
-     [{message, one}]
+     [{message, one}],
+     [{message, one}],[{message, two}]
     ] = flush_messages(),
     [{blocking, BlockingPid}, {non_blocking, NonBlockingPid}] = mb:get_subscribers(test).
     

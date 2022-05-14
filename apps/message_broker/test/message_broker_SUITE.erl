@@ -102,6 +102,7 @@ blocking_subscriber_should_not_block_messages_to_others(_Config) ->
     mb:subscribe(test, blocking, BlockingPid),
     % Message that will cause subscriber to block
     mb:message(test, [{message, one}]),
+    timer:sleep(10),
     % Message that blocked subscriber will not handle
     mb:message(test, [{message, two}]),
     [

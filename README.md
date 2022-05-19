@@ -9,3 +9,4 @@ Applications
 -----
 
 - worker_pool
+- Message broker

@@ -35,32 +35,35 @@ all() ->
      message_available_in_last_segment,
      message_available_in_middle_segment,
      messages_across_multiple_segments,
-     message_is_last_in_segment
+     message_is_last_in_segment,
+     message_not_available_when_no_key
     ].
 
 first_message_not_available(_Config) -> 
-    not_available = mb_log_reader:read([1,5,9], fun noop/1, 11, 1).
+    not_available = mb_log_reader:read([1,5,9], fun get_value/1, 11, 1).
 
 last_message_not_available(_Config) ->
-    not_available = mb_log_reader:read([1,5,9], fun noop/1, 8, 4).
+    not_available = mb_log_reader:read([1,5,9], fun get_value/1, 8, 4).
 
 message_available_in_last_segment(_Config) ->
-    ok = mb_log_reader:read([1,5,9], send_to(self()), 6, 1),
-    [9] = flush_messages().
+    [9] = mb_log_reader:read([1,5,9], fun get_value/1, 6, 1).
 	
 message_available_in_middle_segment(_Config) ->
-    ok = mb_log_reader:read([1,5,9], send_to(self()), 4, 1),
-    [5] = flush_messages().
+    [5] = mb_log_reader:read([1,5,9], fun get_value/1, 4, 1).
 
 messages_across_multiple_segments(_Config) ->
-    ok = mb_log_reader:read([1,5,9], send_to(self()), 4, 3),
-    [5,9] = flush_messages(). 
+    [9,5] = mb_log_reader:read([1,5,9], fun get_value/1, 4, 3).
 
 message_is_last_in_segment(_Config) ->
-    ok = mb_log_reader:read([1,5,9], send_to(self()), 5, 1),
-    [5] = flush_messages().
+    [5] = mb_log_reader:read([1,5,9], fun get_value/1, 5, 1).
+
+message_not_available_when_no_key(_Config) ->
+    not_available = mb_log_reader:read([], fun get_value/1, 1, 1).
 
 %%% Internal functions
+get_value(Key) ->
+    [Key].
+
 send_to(Pid) ->
     fun(Message) ->
 	    Pid ! Message

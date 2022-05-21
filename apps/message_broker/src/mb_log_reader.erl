@@ -4,18 +4,18 @@
 	 read/4
 	]).
 
-read(Keys, Get_key_values_fun, Start_offset, Amount) ->
+read(Keys, Get_value_fun, Start_offset, Amount) ->
     Final_index = Start_offset + (Amount - 1),
     case index_available(Final_index, Keys) of
 	true -> 
 	    Relevant_keys = keys_for_range(Start_offset, Final_index, Keys),
-	    %Get_key_values_fun({Relevant_keys}),
-	    [Get_key_values_fun(Key) || Key <- Relevant_keys],
-	    ok;
+	    lists:flatten(lists:reverse([Get_value_fun(Key) || Key <- Relevant_keys]));
 	false -> 
 	    not_available
     end.
 
+index_available(_Key, []) ->
+    false;
 index_available(Key, Key_list) ->
     % The greatest key indicates the latest message available
     % If the requested key is greater, then the message is not yet available

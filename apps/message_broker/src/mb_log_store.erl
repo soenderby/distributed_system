@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 -export([
-	 start_link/0,
+	 start_link/1,
 	 stop/1,
 	 write/2,
 	 read/3
@@ -16,11 +16,15 @@
 -define(SERVER, ?MODULE).
 
 -record(state, {
-		messages = []
+		keys_fun,
+		get_fun,
+		put_fun,
+		writer_pid
 	       }).
 
-start_link() ->
-    gen_server:start_link(?MODULE, [], []).
+-spec start_link({fun(() -> list(integer())), fun((integer()) -> list()), fun((integer(), list()) -> atom())}) -> ok.
+start_link(Callbacks) ->
+    gen_server:start_link(?MODULE, [Callbacks], []).
 
 stop(Pid) ->
     gen_server:call(Pid, stop).
@@ -32,18 +36,21 @@ read(Pid, Start_offset, Amount) ->
     gen_server:call(Pid, {read, Start_offset, Amount}).
 
 %%% Callbacks
-init([]) ->
+init([{Fetch_keys_fun, Get_fun, Put_fun}]) ->
     process_flag(trap_exit, true),
-    {ok, #state{}}.
+    {ok, Writer_pid} = mb_log_writer:start_link(store_messages(Fetch_keys_fun, Put_fun), 5, 50),
+    {ok, #state{keys_fun = Fetch_keys_fun, get_fun = Get_fun, put_fun = Put_fun, writer_pid = Writer_pid}}.
 
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
 
-handle_call({write, Messages}, _From, State) ->
-    {reply, ok, State#state{messages = Messages}};
-handle_call({read, _Start_offset, _Amount}, {Pid, _}, State = #state{messages = Messages}) ->
-    Pid ! Messages,
-    {reply, ok, State}.
+handle_call({write, Messages}, _From, State = #state{writer_pid = Writer_pid}) ->
+    mb_log_writer:append(Writer_pid, Messages),
+    {reply, ok, State};
+handle_call({read, Start_offset, Amount}, {Pid, _}, State = #state{keys_fun = Keys_fun, get_fun = Get}) ->
+    Messages = mb_log_reader:read(Keys_fun(), Get, Start_offset, Amount),
+    Result = list_segment(Messages, Start_offset, Amount),
+    {reply, Result, State}.
 
 handle_cast(_Request, State) ->
     {noreply, State}.
@@ -61,3 +68,23 @@ format_status(_Opt, Status) ->
     Status.
 
 %%% Internal functions
+list_segment(List, Start, End) ->
+    lists:sublist(lists:nthtail(Start-1, List), End).
+
+flush_messages() ->
+    receive
+        X -> [X|flush_messages()]
+    after 100 ->
+        []
+    end.
+
+store_messages(Key_fun, Put_fun) ->
+    fun(Messages) ->
+	    case Key_fun() of
+		[] ->
+		    New_key = length(Messages);
+		Keys ->
+		    New_key = lists:max(Keys) + length(Messages)
+	    end,
+	    Put_fun(New_key, Messages)
+    end.

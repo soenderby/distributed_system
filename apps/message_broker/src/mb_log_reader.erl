@@ -9,7 +9,7 @@ read(Keys, Get_value_fun, Start_offset, Amount) ->
     case index_available(Final_index, Keys) of
 	true -> 
 	    Relevant_keys = keys_for_range(Start_offset, Final_index, Keys),
-	    lists:flatten(lists:reverse([Get_value_fun(Key) || Key <- Relevant_keys]));
+	    lists:flatten([Get_value_fun(Key) || Key <- Relevant_keys]);
 	false -> 
 	    not_available
     end.

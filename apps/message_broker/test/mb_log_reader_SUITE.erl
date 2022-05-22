@@ -52,7 +52,7 @@ message_available_in_middle_segment(_Config) ->
     [5] = mb_log_reader:read([1,5,9], fun get_value/1, 4, 1).
 
 messages_across_multiple_segments(_Config) ->
-    [9,5] = mb_log_reader:read([1,5,9], fun get_value/1, 4, 3).
+    [5,9] = mb_log_reader:read([1,5,9], fun get_value/1, 4, 3).
 
 message_is_last_in_segment(_Config) ->
     [5] = mb_log_reader:read([1,5,9], fun get_value/1, 5, 1).

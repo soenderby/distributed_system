@@ -47,9 +47,12 @@ handle_call(stop, _From, State) ->
 handle_call({write, Messages}, _From, State = #state{writer_pid = Writer_pid}) ->
     mb_log_writer:append(Writer_pid, Messages),
     {reply, ok, State};
-handle_call({read, Start_offset, Amount}, {Pid, _}, State = #state{keys_fun = Keys_fun, get_fun = Get}) ->
-    Messages = mb_log_reader:read(Keys_fun(), Get, Start_offset, Amount),
-    Result = list_segment(Messages, Start_offset, Amount),
+handle_call({read, Start_offset, Amount}, _From, State = #state{keys_fun = Keys_fun, get_fun = Get}) ->
+    Segments = mb_log_reader:read(Keys_fun(), get_with_key(Get), Start_offset, Amount),
+    {Earliest_segment_end, Earliest_segment_messages} = hd(Segments),
+    Earliest_segment_start = (Earliest_segment_end - length(Earliest_segment_messages)),
+    Messages = lists:flatten([Msg || {_Key, Msg} <- Segments]),
+    Result = list_segment(Messages, Start_offset - Earliest_segment_start, Amount),
     {reply, Result, State}.
 
 handle_cast(_Request, State) ->
@@ -71,13 +74,6 @@ format_status(_Opt, Status) ->
 list_segment(List, Start, End) ->
     lists:sublist(lists:nthtail(Start-1, List), End).
 
-flush_messages() ->
-    receive
-        X -> [X|flush_messages()]
-    after 100 ->
-        []
-    end.
-
 store_messages(Key_fun, Put_fun) ->
     fun(Messages) ->
 	    case Key_fun() of
@@ -87,4 +83,9 @@ store_messages(Key_fun, Put_fun) ->
 		    New_key = lists:max(Keys) + length(Messages)
 	    end,
 	    Put_fun(New_key, Messages)
+    end.
+
+get_with_key(Fun) ->
+    fun(Key) ->
+	    {Key, Fun(Key)}
     end.

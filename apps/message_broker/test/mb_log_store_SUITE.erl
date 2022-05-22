@@ -36,8 +36,9 @@ all() ->
      start_and_stop,
      read_all_written_messages,
      read_subset_of_messages,
-%     multiple_segments,
-     uses_given_callbacks
+     multiple_segments,
+     uses_given_callbacks,
+     read_interval_across_multiple_segments
     ].
 
 start_and_stop(_Config) -> 
@@ -65,8 +66,9 @@ multiple_segments(_Config) ->
     Pid = start(),
     ok = mb_log_store:write(Pid, [1,2,3,4,5]),
     ok = mb_log_store:write(Pid, [6,7,8,9,10]),
-    [1,2,3,4,5] = mb_log_store:read(Pid, 1, 5),
+    ok = mb_log_store:write(Pid, [12]),
     [6,7,8,9,10] = mb_log_store:read(Pid, 6, 5),
+    [1,2,3,4,5] = mb_log_store:read(Pid, 1, 5),
     mb_log_store:stop(Pid).
 
 uses_given_callbacks(_Config) ->
@@ -74,6 +76,14 @@ uses_given_callbacks(_Config) ->
     dict_server:put(5, [1,2,3,4,5]),
     [1,2,3,4,5] = mb_log_store:read(Pid, 1, 5),
     [2,3,4] = mb_log_store:read(Pid, 2, 3),
+    mb_log_store:stop(Pid).
+
+read_interval_across_multiple_segments(_Config) ->
+    Pid = start(),
+    ok = mb_log_store:write(Pid, [1,2,3,4,5]),
+    ok = mb_log_store:write(Pid, [6,7,8,9,10]),
+    ok = mb_log_store:write(Pid, [12]),
+    [3,4,5,6,7] = mb_log_store:read(Pid, 3, 5),
     mb_log_store:stop(Pid).
 
 %% Internal functions

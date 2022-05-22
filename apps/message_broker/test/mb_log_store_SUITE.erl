@@ -50,7 +50,6 @@ read_all_written_messages(_Config) ->
     Pid = start(),
     ok = mb_log_store:write(Pid, [1,2,3,4,5]),
     ok = mb_log_store:write(Pid, [6]),
-    timer:sleep(100),
     [1,2,3,4,5] = mb_log_store:read(Pid, 1, 5),
     mb_log_store:stop(Pid).
 
@@ -58,7 +57,6 @@ read_subset_of_messages(_Config) ->
     Pid = start(),
     ok = mb_log_store:write(Pid, [1,2,3,4,5]),
     ok = mb_log_store:write(Pid, [6]),
-    timer:sleep(100),
     [1,2,3,4,5] = mb_log_store:read(Pid, 1,5),
     [2,3,4] = mb_log_store:read(Pid, 2, 3),
     mb_log_store:stop(Pid).

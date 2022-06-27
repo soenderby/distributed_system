@@ -3,7 +3,7 @@
 -behaviour(gen_server).
 
 -export([
-	 start_link/1,
+	 start_link/3,
 	 stop/1,
 	 write/2,
 	 read/3
@@ -15,6 +15,11 @@
 
 -define(SERVER, ?MODULE).
 
+-define(SPEC(Persist_fun, Msg_limit, Timeout),
+       {mb_log_writer,
+        {mb_log_writer, start_link, [Persist_fun, Msg_limit, Timeout]},
+        permanent, 10500, worker, [mb_log_writer]}).
+
 -record(state, {
 		keys_fun,
 		get_fun,
@@ -22,9 +27,9 @@
 		writer_pid
 	       }).
 
--spec start_link({fun(() -> list(integer())), fun((integer()) -> list()), fun((integer(), list()) -> atom())}) -> ok.
-start_link(Callbacks) ->
-    gen_server:start_link(?MODULE, [Callbacks], []).
+-spec start_link(atom(), {fun(() -> list(integer())), fun((integer()) -> list()), fun((integer(), list()) -> atom())}, pid()) -> ok.
+start_link(Name, Callbacks, Supervisor) ->
+    gen_server:start_link({local, Name}, ?MODULE, [Callbacks, Supervisor], []).
 
 stop(Pid) ->
     gen_server:call(Pid, stop).
@@ -36,10 +41,10 @@ read(Pid, Start_offset, Amount) ->
     gen_server:call(Pid, {read, Start_offset, Amount}).
 
 %%% Callbacks
-init([{Fetch_keys_fun, Get_fun, Put_fun}]) ->
+init([{Fetch_keys_fun, Get_fun, Put_fun}, Supervisor]) ->
     process_flag(trap_exit, true),
-    {ok, Writer_pid} = mb_log_writer:start_link(store_messages(Fetch_keys_fun, Put_fun), 5, 50),
-    {ok, #state{keys_fun = Fetch_keys_fun, get_fun = Get_fun, put_fun = Put_fun, writer_pid = Writer_pid}}.
+    self() ! {start_writer, store_messages(Fetch_keys_fun, Put_fun), 5, 50, Supervisor},
+    {ok, #state{keys_fun = Fetch_keys_fun, get_fun = Get_fun, put_fun = Put_fun}}.
 
 handle_call(stop, _From, State) ->
     {stop, normal, ok, State};
@@ -58,6 +63,11 @@ handle_call({read, Start_offset, Amount}, _From, State = #state{keys_fun = Keys_
 handle_cast(_Request, State) ->
     {noreply, State}.
 
+handle_info({start_writer, Persist_fun, Msg_limit, Timeout, Supervisor}, State) ->
+    %{ok, Writer_pid} = mb_log_writer:start_link(store_messages(Fetch_keys_fun, Put_fun), 5, 50),
+    {ok, Writer_pid} = supervisor:start_child(Supervisor, ?SPEC(Persist_fun, Msg_limit, Timeout)),
+    link(Writer_pid),
+    {noreply, State#state{writer_pid = Writer_pid}};
 handle_info(_Info, State) ->
     {noreply, State}.
 

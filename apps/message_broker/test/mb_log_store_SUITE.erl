@@ -4,6 +4,8 @@
 
 -include_lib("common_test/include/ct.hrl").
 
+-define(value(Key,Config), proplists:get_value(Key,Config)).
+
 suite() ->
     [{timetrap,{seconds,30}}].
 
@@ -21,13 +23,14 @@ end_per_group(_GroupName, _Config) ->
 
 init_per_testcase(_TestCase, Config) ->
     dict_server:start(),
-    Config.
+    {ok, _Sup_pid} = mb_log_sup:start_link(test, {fun dict_server:keys/0, fun dict_server:get/1, fun dict_server:put/2}),
+    Pid = whereis(test),
+    [{pid, Pid}|Config].
 
 end_per_testcase(_TestCase, _Config) ->
-   dict_server:stop(),
+    dict_server:stop(),
     ok.
 
-%% TODO: Create a group for tests that use the process dictionary and one for those that use the dict_server
 groups() ->
     [].
 
@@ -41,50 +44,56 @@ all() ->
      read_interval_across_multiple_segments
     ].
 
-start_and_stop(_Config) -> 
-    Pid = start(),
+start_and_stop(_Config) ->
+    "Check that the supervisor starts the process, and that it terminates when the supervisor terminates",
+    {ok, Sup_pid} = mb_log_sup:start_link(start_stop_test, {fun dict_server:keys/0, fun dict_server:get/1, fun dict_server:put/2}),
+    % Unlink so the test process does not terminate when the supervisor does
+    true = unlink(Sup_pid),
+    % Monitor so message is received when supervisor exits
+    Ref = monitor(process, Sup_pid),
+    Pid = whereis(start_stop_test),
     true = is_process_alive(Pid),
-    ok = mb_log_store:stop(Pid),
-    false = is_process_alive(Pid).
+    exit(Sup_pid, shutdown),
+    receive
+	{'DOWN', Ref, process, Sup_pid, _Reason} ->
+	    false = is_process_alive(Pid)
+    after 1000 ->
+	    error(exit_timeout)
+    end.
 
-read_all_written_messages(_Config) ->
-    Pid = start(),
+read_all_written_messages(Config) ->
+    Pid = ?value(pid, Config),
     ok = mb_log_store:write(Pid, [1,2,3,4,5]),
     ok = mb_log_store:write(Pid, [6]),
-    [1,2,3,4,5] = mb_log_store:read(Pid, 1, 5),
-    mb_log_store:stop(Pid).
+    [1,2,3,4,5] = mb_log_store:read(Pid, 1, 5).
 
-read_subset_of_messages(_Config) ->
-    Pid = start(),
+read_subset_of_messages(Config) ->
+    Pid = ?value(pid, Config),
     ok = mb_log_store:write(Pid, [1,2,3,4,5]),
     ok = mb_log_store:write(Pid, [6]),
     [1,2,3,4,5] = mb_log_store:read(Pid, 1,5),
-    [2,3,4] = mb_log_store:read(Pid, 2, 3),
-    mb_log_store:stop(Pid).
+    [2,3,4] = mb_log_store:read(Pid, 2, 3).
 
-multiple_segments(_Config) ->
-    Pid = start(),
+multiple_segments(Config) ->
+    Pid = ?value(pid, Config),
     ok = mb_log_store:write(Pid, [1,2,3,4,5]),
     ok = mb_log_store:write(Pid, [6,7,8,9,10]),
     ok = mb_log_store:write(Pid, [12]),
     [6,7,8,9,10] = mb_log_store:read(Pid, 6, 5),
-    [1,2,3,4,5] = mb_log_store:read(Pid, 1, 5),
-    mb_log_store:stop(Pid).
+    [1,2,3,4,5] = mb_log_store:read(Pid, 1, 5).
 
-uses_given_callbacks(_Config) ->
-    Pid = start(),
+uses_given_callbacks(Config) ->
+    Pid = ?value(pid, Config),
     dict_server:put(5, [1,2,3,4,5]),
     [1,2,3,4,5] = mb_log_store:read(Pid, 1, 5),
-    [2,3,4] = mb_log_store:read(Pid, 2, 3),
-    mb_log_store:stop(Pid).
+    [2,3,4] = mb_log_store:read(Pid, 2, 3).
 
-read_interval_across_multiple_segments(_Config) ->
-    Pid = start(),
+read_interval_across_multiple_segments(Config) ->
+    Pid = ?value(pid, Config),
     ok = mb_log_store:write(Pid, [1,2,3,4,5]),
     ok = mb_log_store:write(Pid, [6,7,8,9,10]),
     ok = mb_log_store:write(Pid, [12]),
-    [3,4,5,6,7] = mb_log_store:read(Pid, 3, 5),
-    mb_log_store:stop(Pid).
+    [3,4,5,6,7] = mb_log_store:read(Pid, 3, 5).
 
 %% Internal functions
 start() ->

@@ -18,8 +18,6 @@
 	 terminate/2
 	]).
 
--define(SERVER, ?MODULE).
-
 -record(state, {
 		messages = [],
 		persist_fun,

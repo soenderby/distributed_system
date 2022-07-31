@@ -13,6 +13,13 @@
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
 	 terminate/2, code_change/3, format_status/2]).
 
+-type name() :: atom().
+-type fetch_keys_fun() :: fun(() -> list(integer())).
+-type get_fun() :: fun((integer()) -> list()).
+-type put_fun() :: fun((integer(), list()) -> atom()).
+-type log_backend_callbacks() :: {fetch_keys_fun(), get_fun(), put_fun()}.
+-type supervisor() :: pid().
+
 -define(SERVER, ?MODULE).
 
 -define(SPEC(Persist_fun, Msg_limit, Timeout),
@@ -27,7 +34,7 @@
 		writer_pid
 	       }).
 
--spec start_link(atom(), {fun(() -> list(integer())), fun((integer()) -> list()), fun((integer(), list()) -> atom())}, pid()) -> ok.
+-spec start_link(name(), log_backend_callbacks(), supervisor()) -> ok.
 start_link(Name, Callbacks, Supervisor) ->
     gen_server:start_link({local, Name}, ?MODULE, [Callbacks, Supervisor], []).
 
